@@ -1,13 +1,14 @@
 # messing-around
 
 from tkinter import *
-
+import random
+import copy
 
 def init(data):
 	data.points = list()
 	data.userPoints = list()
-
-
+	data.score = None
+	data.letterType = 1
 def generateLine(canvas, data, startx,starty,slope,length, type): #add in parameters initialx, initialy, slope
 	initialx = startx
 	initialy = starty
@@ -37,16 +38,16 @@ def generateEllipse(canvas,data,centerx,centery,type, a, b):
 		currentOy = centery - currenty
 		if type == 0 or type == 2 or type == 3 or type == 5:
 			canvas.create_line(currentPx,currentPy,currentPx+1,currentPy+1) #4th quadrant
-			data.points.append([currentPx,currentPy])
+			data.points.append([int(currentPx),int(currentPy)])
 		if type == 2 or type == 3 or type == 4:
 			canvas.create_line(currentPx,currentOy, currentPx+1,currentOy + 1) #1st quadrant
-			data.points.append([currentPx,currentOy])
+			data.points.append([int(currentPx),int(currentOy)])
 		if type == 0 or type == 1 or type == 3 or type == 6:
 			canvas.create_line(currentOx,currentPy,currentOx+1,currentPy + 1)  #3rd quadrant
-			data.points.append([currentOx,currentPy])
+			data.points.append([int(currentOx),int(currentPy)])
 		if type == 1 or type == 3:
 			canvas.create_line(currentOx,currentOy,currentOx+1,currentOy + 1) #2nd quadrant
-			data.points.append([currentOx,currentOy])
+			data.points.append([int(currentOx),int(currentOy)])
 			
 def makeLetter(canvas, data, n):
 	data.points = list()
@@ -150,13 +151,92 @@ def makeLetter(canvas, data, n):
 		generateLine(canvas,data,200,300,0,125,0)
 		generateLine(canvas,data,200,300,.8,125,0)
 	
+def regression(data, type):
+	#print(data.userPoints)
+	sortedUserPoints = copy.deepcopy(data.userPoints)
+	sortedPoints = copy.deepcopy(data.points)
+	sortedUserPoints.sort()
+	sortedPoints.sort()
+	#print(sortedUserPoints)
 	
+	#print(sortedUserPoints)
+	if type == 1:
+		epsilonx = 10
+		epsilony = 10
+	else:
+		epsilonx = 10
+		epsilony = 10
+	sumErrorx = 0
+	sumErrory = 0
+	for i in range(len(data.points)): #xs
+		bigger = None
+		biggerIndex = None
+		smaller = None
+		smallerIndex = None
+		for j in range(len(data.userPoints)):
+			if sortedUserPoints[j][0] > sortedPoints[i][0] and bigger == None:
+				bigger = sortedUserPoints[j][0]
+				biggerIndex = j
+				smaller = sortedUserPoints[j-1][0]
+				smallerIndex = j -1
+				break
+		if (bigger == None):
+			closestIndex = len(sortedUserPoints) - 1
+		elif (smallerIndex == -1):
+			closestIndex = 0
+		elif (bigger - sortedPoints[i][1]) < (sortedPoints[i][1]-smaller):
+			closestIndex = biggerIndex
+		else: closestIndex = smallerIndex
+		#print(len(sortedPoints),i,len(sortedUserPoints),closestIndex)
+		if abs(sortedPoints[i][0] - sortedUserPoints[closestIndex][0]) < epsilonx:
+			pass
+		else:
+			sumErrorx += 1
+			continue
+		bigger = None
+		biggerIndex = None
+		smaller = None
+		smallerIndex = None
+		possibleYs = list()
+		closestYIndex = None
+		for j in range(len(sortedUserPoints)):
+			if sortedUserPoints[closestIndex][0] == sortedUserPoints[j][0]:
+				possibleYs.append(sortedUserPoints[closestIndex][1])
+		possibleYs.sort()	
+		for k in range(len(possibleYs) - 1):
+			if possibleYs[k + 1] > possibleYs[k] and bigger == None:
+				bigger = possibleYs[k+1]
+				biggerIndex = k + 1
+				smaller = possibleYs[k]
+				smallerIndex = k
+				break
+		if (bigger == None):
+			closestYIndex = len(possibleYs) - 1
+		elif ((bigger - possibleYs[biggerIndex]) < (possibleYs[smallerIndex]-smaller)):
+			closestYIndex = biggerIndex
+		else: closestYIndex = smallerIndex
+		if (abs(sortedPoints[i][1] - possibleYs[closestYIndex]) < epsilony):
+			pass
+		else:
+			sumErrory += 1
+	data.score = (100 - (((sumErrory + sumErrorx )/(len(sortedPoints))) * 100))
+	if data.score < 0:
+		data.score = 0
+	print(data.score)
+					
+		
 def mousePressed(event, data):
-	data.userPoints = data.userPoints + [[event.x,event.y]]
+	try: data.userPoints = data.userPoints + [[int(event.x),int(event.y)]]
+	except: print("Failed")
+	
 
+def mouseRelease(event,data):
+	data.userPoints = data.userPoints + [[-1,-1]]
 def keyPressed(event, data):
-    pass
-
+	if event.keysym == "d":
+		regression(data, data.letterType)
+	if event.keysym == "c":
+		data.userPoints = list()
 def timerFired(data):
     pass
 
@@ -179,7 +259,8 @@ def redrawAll(canvas, data):
 	for i in range(len(data.userPoints)):
 		#print(data.userPoints[i])
 		if i > 1:
-			canvas.create_line(data.userPoints[i-1][0],data.userPoints[i-1][1],data.userPoints[i][0],data.userPoints[i][1])
+			if data.userPoints[i-1][0] != -1 and data.userPoints[i][0] != -1:
+				canvas.create_line(data.userPoints[i-1][0],data.userPoints[i-1][1],data.userPoints[i][0],data.userPoints[i][1])
 ####################################
 # use the run function as-is
 ####################################
@@ -197,7 +278,9 @@ def run(width=300, height=300):
     def keyPressedWrapper(event, canvas, data):
         keyPressed(event, data)
         redrawAllWrapper(canvas, data)
-
+    def mouseReleaseWrapper(event, canvas, data):
+        mouseRelease(event, data)
+        redrawAllWrapper(canvas, data)
     def timerFiredWrapper(canvas, data):
         timerFired(data)
         redrawAllWrapper(canvas, data)
@@ -208,7 +291,7 @@ def run(width=300, height=300):
     data = Struct()
     data.width = width
     data.height = height
-    data.timerDelay = 100 # milliseconds
+    data.timerDelay = 10000 # milliseconds
     init(data)
     # create the root and the canvas
     root = Tk()
@@ -219,6 +302,8 @@ def run(width=300, height=300):
                             mousePressedWrapper(event, canvas, data))
     root.bind("<Key>", lambda event:
                             keyPressedWrapper(event, canvas, data))
+    root.bind("<Button-1>", lambda event:
+                            mouseReleaseWrapper(event, canvas, data))							
     timerFiredWrapper(canvas, data)
     # and launch the app
     root.mainloop()  # blocks until window is closed
